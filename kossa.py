@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS photos (
 conn.commit()
 
 user_photos = {}
+user_timers = {}
 
 def build_caption(message):
     username = message.from_user.username
@@ -53,14 +54,16 @@ def build_caption(message):
 
 def send_album(user_id, message):
     media = []
-    for file_id in user_photos[user_id]:
+    for file_id in user_photos.get(user_id, []):
         media.append(types.InputMediaPhoto(media=file_id))
 
     if media:
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, build_caption(message), parse_mode="Markdown")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
+
     user_photos.pop(user_id, None)
+    user_timers.pop(user_id, None)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -71,38 +74,16 @@ def handle_photos(message):
     user_id = message.from_user.id
     file_id = message.photo[-1].file_id
 
+    # Добавляем фото в список
     if user_id not in user_photos:
         user_photos[user_id] = []
 
     user_photos[user_id].append(file_id)
 
-    threading.Timer(2.5, send_album, args=(user_id, message)).start()
+    # Перезапускаем таймер
+    if user_id in user_timers:
+        user_timers[user_id].cancel()
 
-    # Сохраняем в базу PostgreSQL
-    cur.execute('''
-        INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    ''', (
-        message.from_user.id,
-        message.from_user.username,
-        message.from_user.first_name,
-        message.from_user.last_name,
-        file_id,
-        datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    ))
-    conn.commit()
-
-# Flask endpoint (не используется, но может быть полезен)
-@app.route('/')
-def index():
-    return 'Бот работает!'
-
-def run_bot():
-    bot.infinity_polling()
-
-if __name__ == '__main__':
-    threading.Thread(target=run_bot).start()
-    app.run(host='0.0.0.0', port=8080)
-# Запуск бота через polling
-bot.polling(none_stop=True)
+    timer = threading.Timer(5.0, send_album, args=(user_id, message))
+    user_timers[user_id] = timer
 
