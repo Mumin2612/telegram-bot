@@ -1,17 +1,15 @@
 import telebot
-from flask import Flask, request
 from datetime import datetime
-import threading
 from telebot import types
+import threading
+import time
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
-ADMIN_ID = 7889110301  # ← замени на свой Telegram ID
+ADMIN_ID = 7889110301  # ← вставь свой Telegram ID
 
 bot = telebot.TeleBot(TOKEN)
-app = Flask(__name__)
-
-# Временное хранилище фото
 user_photos = {}
+timers = {}
 
 def build_caption(message):
     username = message.from_user.username
@@ -34,15 +32,22 @@ def build_caption(message):
     )
 
 def send_album(user_id, message):
-    media = []
-    for file_id in user_photos[user_id]:
-        media.append(types.InputMediaPhoto(media=file_id))
-
+    media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos[user_id]]
     if media:
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, build_caption(message), parse_mode="Markdown")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
     user_photos.pop(user_id, None)
+    timers.pop(user_id, None)
+
+def timer_send(user_id, message):
+    def task():
+        time.sleep(5)  # ждём 5 секунд после последнего фото
+        send_album(user_id, message)
+    if user_id in timers:
+        timers[user_id].cancel()
+    timers[user_id] = threading.Timer(5.0, task)
+    timers[user_id].start()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -50,6 +55,15 @@ def start_message(message):
 
 @bot.message_handler(content_types=['photo'])
 def handle_photos(message):
-    user_id = message.from_user
+    user_id = message.from_user.id
+    file_id = message.photo[-1].file_id
 
-    timer_send()
+    if user_id not in user_photos:
+        user_photos[user_id] = []
+
+    user_photos[user_id].append(file_id)
+    timer_send(user_id, message)
+
+# Запуск бота через polling
+bot.polling(none_stop=True)
+
