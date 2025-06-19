@@ -3,6 +3,24 @@ from datetime import datetime
 from telebot import types
 import threading
 import time
+import sqlite3
+
+# Создание базы и таблицы, если их ещё нет
+conn = sqlite3.connect('database.db', check_same_thread=False)
+cursor = conn.cursor()
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS photos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    username TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    file_id TEXT,
+    timestamp TEXT
+)
+''')
+conn.commit()
+
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301  # ← вставь свой Telegram ID
@@ -57,6 +75,20 @@ def start_message(message):
 def handle_photos(message):
     user_id = message.from_user.id
     file_id = message.photo[-1].file_id
+    # Сохраняем в базу
+cursor.execute('''
+    INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
+    VALUES (?, ?, ?, ?, ?, ?)
+''', (
+    message.from_user.id,
+    message.from_user.username,
+    message.from_user.first_name,
+    message.from_user.last_name,
+    message.photo[-1].file_id,
+    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+))
+conn.commit()
+
 
     if user_id not in user_photos:
         user_photos[user_id] = []
