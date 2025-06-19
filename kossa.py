@@ -4,8 +4,8 @@ from datetime import datetime
 import threading
 from telebot import types
 
-TOKEN = 'ТВОЙ_ТОКЕН'
-ADMIN_ID = 123456789  # ← замени на свой Telegram ID
+TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
+ADMIN_ID = 7889110301  # ← замени на свой Telegram ID
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
