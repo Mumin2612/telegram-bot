@@ -74,16 +74,43 @@ def handle_photos(message):
     user_id = message.from_user.id
     file_id = message.photo[-1].file_id
 
-    # Добавляем фото в список
     if user_id not in user_photos:
         user_photos[user_id] = []
 
     user_photos[user_id].append(file_id)
 
-    # Перезапускаем таймер
     if user_id in user_timers:
         user_timers[user_id].cancel()
 
     timer = threading.Timer(5.0, send_album, args=(user_id, message))
     user_timers[user_id] = timer
+    timer.start()
+
+    # Сохраняем в PostgreSQL
+    cur.execute('''
+        INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    ''', (
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.first_name,
+        message.from_user.last_name,
+        file_id,
+        datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ))
+    conn.commit()
+
+# Flask endpoint (опционально)
+@app.route('/')
+def index():
+    return 'Бот работает!'
+
+# Запуск бота в потоке + Flask
+def run_bot():
+    bot.infinity_polling()
+
+if __name__ == '__main__':
+    threading.Thread(target=run_bot).start()
+    app.run(host='0.0.0.0', port=8080)
+
 
