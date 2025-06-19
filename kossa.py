@@ -2,8 +2,8 @@ import telebot
 from flask import Flask, request
 from datetime import datetime
 import threading
-import psycopg2
 from telebot import types
+import psycopg2
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
@@ -13,29 +13,23 @@ app = Flask(__name__)
 
 # Подключение к PostgreSQL
 conn = psycopg2.connect("postgresql://telegram_db_zoh4_user:IUOsy6VjxHcaBcZEC32AVMW0tWD7j4pp@dpg-d19vut15pdvs73a9q9f0-a.oregon-postgres.render.com/telegram_db_zoh4")
-cursor = conn.cursor()
+cur = conn.cursor()
 
-# Создание таблицы, если её ещё нет
-cursor.execute('''
-    CREATE TABLE IF NOT EXISTS photos (
-        id SERIAL PRIMARY KEY,
-        user_id BIGINT,
-        username TEXT,
-        first_name TEXT,
-        last_name TEXT,
-        file_id TEXT,
-        timestamp TEXT
-    )
+# Создание таблицы, если не существует
+cur.execute('''
+CREATE TABLE IF NOT EXISTS photos (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT,
+    username TEXT,
+    first_name TEXT,
+    last_name TEXT,
+    file_id TEXT,
+    timestamp TEXT
+)
 ''')
 conn.commit()
 
-
-TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
-ADMIN_ID = 7889110301  # ← вставь свой Telegram ID
-
-bot = telebot.TeleBot(TOKEN)
 user_photos = {}
-timers = {}
 
 def build_caption(message):
     username = message.from_user.username
@@ -58,22 +52,15 @@ def build_caption(message):
     )
 
 def send_album(user_id, message):
-    media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos[user_id]]
+    media = []
+    for file_id in user_photos[user_id]:
+        media.append(types.InputMediaPhoto(media=file_id))
+
     if media:
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, build_caption(message), parse_mode="Markdown")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
     user_photos.pop(user_id, None)
-    timers.pop(user_id, None)
-
-def timer_send(user_id, message):
-    def task():
-        time.sleep(5)  # ждём 5 секунд после последнего фото
-        send_album(user_id, message)
-    if user_id in timers:
-        timers[user_id].cancel()
-    timers[user_id] = threading.Timer(5.0, task)
-    timers[user_id].start()
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -83,27 +70,39 @@ def start_message(message):
 def handle_photos(message):
     user_id = message.from_user.id
     file_id = message.photo[-1].file_id
-    # Сохраняем в базу
-cursor.execute('''
-    INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
-    VALUES (?, ?, ?, ?, ?, ?)
-''', (
-    message.from_user.id,
-    message.from_user.username,
-    message.from_user.first_name,
-    message.from_user.last_name,
-    message.photo[-1].file_id,
-    datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-))
-conn.commit()
-
 
     if user_id not in user_photos:
         user_photos[user_id] = []
 
     user_photos[user_id].append(file_id)
-    timer_send(user_id, message)
 
+    threading.Timer(2.5, send_album, args=(user_id, message)).start()
+
+    # Сохраняем в базу PostgreSQL
+    cur.execute('''
+        INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    ''', (
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.first_name,
+        message.from_user.last_name,
+        file_id,
+        datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    ))
+    conn.commit()
+
+# Flask endpoint (не используется, но может быть полезен)
+@app.route('/')
+def index():
+    return 'Бот работает!'
+
+def run_bot():
+    bot.infinity_polling()
+
+if __name__ == '__main__':
+    threading.Thread(target=run_bot).start()
+    app.run(host='0.0.0.0', port=8080)
 # Запуск бота через polling
 bot.polling(none_stop=True)
 
