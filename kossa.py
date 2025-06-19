@@ -1,17 +1,14 @@
 import telebot
+from flask import Flask, request
 from datetime import datetime
+import threading
+from telebot import types
 
-TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
-ADMIN_ID = 7889110301
+TOKEN = 'ТВОЙ_ТОКЕН'
+ADMIN_ID = 123456789  # ← замени на свой Telegram ID
 
 bot = telebot.TeleBot(TOKEN)
-
-@bot.message_handler(commands=['start'])
-def start_message(message):
-    bot.send_message(message.chat.id, "Привет! Пожалуйста, отправь фото фактуры.")
-
-from telebot import types
-import threading
+app = Flask(__name__)
 
 # Временное хранилище фото
 user_photos = {}
@@ -44,21 +41,15 @@ def send_album(user_id, message):
     if media:
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, build_caption(message), parse_mode="Markdown")
-        bot.send_message(user_id, "✅ Спасибо! Все фото отправлены.")
+        bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
     user_photos.pop(user_id, None)
+
+@bot.message_handler(commands=['start'])
+def start_message(message):
+    bot.send_message(message.chat.id, "Привет! Отправь мне одно или несколько фото фактур подряд.")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photos(message):
-    user_id = message.from_user.id
-    file_id = message.photo[-1].file_id
-
-    if user_id not in user_photos:
-        user_photos[user_id] = []
-
-    user_photos[user_id].append(file_id)
-
-    # Запускаем таймер: если за 5 секунд не придёт новое фото — отправим альбом
-    def timer_send():
-        threading.Timer(5.0, send_album, args=[user_id, message]).start()
+    user_id = message.from_user
 
     timer_send()
