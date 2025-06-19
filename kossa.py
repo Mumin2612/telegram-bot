@@ -1,4 +1,6 @@
 import telebot
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 from flask import Flask, request
 from datetime import datetime
 import threading
@@ -11,26 +13,17 @@ ADMIN_ID = 7889110301
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# Подключение к PostgreSQL
-conn = psycopg2.connect("postgresql://telegram_db_zoh4_user:IUOsy6VjxHcaBcZEC32AVMW0tWD7j4pp@dpg-d19vut15pdvs73a9q9f0-a.oregon-postgres.render.com/telegram_db_zoh4")
-cur = conn.cursor()
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
 
-# Создание таблицы, если не существует
-cur.execute('''
-CREATE TABLE IF NOT EXISTS photos (
-    id SERIAL PRIMARY KEY,
-    user_id BIGINT,
-    username TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    file_id TEXT,
-    timestamp TEXT
-)
-''')
-conn.commit()
+spreadsheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1wjYkcXWUbfk6BBAnTaT80xP9M98K3upVSlugWC7Ddow/edit")
+sheet = spreadsheet.sheet1
+
 
 user_photos = {}
 user_timers = {}
+
 
 def build_caption(message):
     username = message.from_user.username
