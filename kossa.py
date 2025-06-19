@@ -1,23 +1,31 @@
 import telebot
+from flask import Flask, request
 from datetime import datetime
-from telebot import types
 import threading
-import time
-import sqlite3
+import psycopg2
+from telebot import types
 
-# Создание базы и таблицы, если их ещё нет
-conn = sqlite3.connect('database.db', check_same_thread=False)
+TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
+ADMIN_ID = 7889110301
+
+bot = telebot.TeleBot(TOKEN)
+app = Flask(__name__)
+
+# Подключение к PostgreSQL
+conn = psycopg2.connect("postgresql://telegram_db_zoh4_user:IUOsy6VjxHcaBcZEC32AVMW0tWD7j4pp@dpg-d19vut15pdvs73a9q9f0-a.oregon-postgres.render.com/telegram_db_zoh4")
 cursor = conn.cursor()
+
+# Создание таблицы, если её ещё нет
 cursor.execute('''
-CREATE TABLE IF NOT EXISTS photos (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER,
-    username TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    file_id TEXT,
-    timestamp TEXT
-)
+    CREATE TABLE IF NOT EXISTS photos (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT,
+        username TEXT,
+        first_name TEXT,
+        last_name TEXT,
+        file_id TEXT,
+        timestamp TEXT
+    )
 ''')
 conn.commit()
 
