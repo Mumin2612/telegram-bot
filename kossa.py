@@ -10,31 +10,55 @@ bot = telebot.TeleBot(TOKEN)
 def start_message(message):
     bot.send_message(message.chat.id, "Привет! Пожалуйста, отправь фото фактуры.")
 
-@bot.message_handler(content_types=['photo'])
-def handle_photo(message):
-    if message.from_user.username:
-    user_link = f"@{message.from_user.username}"
-else:
-    user_link = f"[профиль](tg://user?id={message.from_user.id})"
+from telebot import types
+import threading
 
+# Временное хранилище фото
+user_photos = {}
+
+def build_caption(message):
+    username = message.from_user.username
     first_name = message.from_user.first_name or ""
     last_name = message.from_user.last_name or ""
     sender_id = message.from_user.id
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-    file_id = message.photo[-1].file_id
-    file_info = bot.get_file(file_id)
-    downloaded_file = bot.download_file(file_info.file_path)
+    if username:
+        user_link = f"@{username}"
+    else:
+        user_link = f"[профиль](tg://user?id={sender_id})"
 
-    caption = (
-        f"📸 Новое фото\n"
+    return (
+        f"📸 Новые фото\n"
         f"👤 Имя: {first_name} {last_name}\n"
         f"🔗 {user_link}\n"
         f"🆔 ID: {sender_id}\n"
         f"🕒 Время: {timestamp}"
     )
 
-    bot.send_photo(ADMIN_ID, downloaded_file, caption=caption)
-    bot.send_message(message.chat.id, "✅ Спасибо! Фото отправлено.")
+def send_album(user_id, message):
+    media = []
+    for file_id in user_photos[user_id]:
+        media.append(types.InputMediaPhoto(media=file_id))
 
-bot.polling()
+    if media:
+        bot.send_media_group(ADMIN_ID, media)
+        bot.send_message(ADMIN_ID, build_caption(message), parse_mode="Markdown")
+        bot.send_message(user_id, "✅ Спасибо! Все фото отправлены.")
+    user_photos.pop(user_id, None)
+
+@bot.message_handler(content_types=['photo'])
+def handle_photos(message):
+    user_id = message.from_user.id
+    file_id = message.photo[-1].file_id
+
+    if user_id not in user_photos:
+        user_photos[user_id] = []
+
+    user_photos[user_id].append(file_id)
+
+    # Запускаем таймер: если за 5 секунд не придёт новое фото — отправим альбом
+    def timer_send():
+        threading.Timer(5.0, send_album, args=[user_id, message]).start()
+
+    timer_send()
