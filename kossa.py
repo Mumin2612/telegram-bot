@@ -12,7 +12,11 @@ def start_message(message):
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    username = message.from_user.username or "без username"
+    if message.from_user.username:
+    user_link = f"@{message.from_user.username}"
+else:
+    user_link = f"[профиль](tg://user?id={message.from_user.id})"
+
     first_name = message.from_user.first_name or ""
     last_name = message.from_user.last_name or ""
     sender_id = message.from_user.id
@@ -25,7 +29,7 @@ def handle_photo(message):
     caption = (
         f"📸 Новое фото\n"
         f"👤 Имя: {first_name} {last_name}\n"
-        f"🔗 Username: @{username}\n"
+        f"🔗 {user_link}\n"
         f"🆔 ID: {sender_id}\n"
         f"🕒 Время: {timestamp}"
     )
