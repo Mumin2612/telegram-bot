@@ -27,13 +27,24 @@ def send_album(user_id, message):
     media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos.get(user_id, [])]
     if media:
         caption = build_caption(user_id, user_data[user_id])
+   def send_album(user_id, message):
+    media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos.get(user_id, [])]
+
+    if media:
+        user_info = {
+            "username": message.from_user.username or "",
+            "first_name": message.from_user.first_name or user_names.get(user_id, ""),
+            "last_name": message.from_user.last_name or "",
+        }
+        caption = build_caption(user_id, user_info)
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, caption, parse_mode="Markdown")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
+
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
     user_states.pop(user_id, None)
-    user_data.pop(user_id, None)
+    user_names.pop(user_id, None)  # ← исправил имя словаря, было user_data
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
@@ -74,7 +85,7 @@ def handle_photos(message):
     if user_id in user_timers:
         user_timers[user_id].cancel()
 
-    user_timers[user_id] = threading.Timer(5.0, send_album, args=(user_id, message))
+    user_timers[user_id] = threading.Timer(30.0, send_album, args=(user_id, message))
     user_timers[user_id].start()
 
 @app.route('/')
