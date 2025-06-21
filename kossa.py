@@ -15,11 +15,15 @@ user_timers = {}
 user_states = {}
 user_data = {}
 
+def escape_markdown(text):
+    escape_chars = r"_*[]()~`>#+-=|{}.!"
+    return ''.join(['\\' + char if char in escape_chars else char for char in text])
+
 def build_caption(user_id):
     info = user_data.get(user_id, {})
-    first_name = info.get("first_name", "")
-    last_name = info.get("last_name", "")
-    username = info.get("username", "")
+    first_name = escape_markdown(info.get("first_name", ""))
+    last_name = escape_markdown(info.get("last_name", ""))
+    username = escape_markdown(info.get("username", ""))
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     user_link = f"@{username}" if username else f"[профиль](tg://user?id={user_id})"
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
@@ -29,7 +33,7 @@ def send_album(user_id, message):
     if media:
         caption = build_caption(user_id)
         bot.send_media_group(ADMIN_ID, media)
-        bot.send_message(ADMIN_ID, caption, parse_mode="Markdown")
+        bot.send_message(ADMIN_ID, caption, parse_mode="MarkdownV2")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
@@ -84,7 +88,3 @@ def run_bot():
 if __name__ == '__main__':
     threading.Thread(target=run_bot).start()
     app.run(host='0.0.0.0', port=8080)
-
-
-
-
