@@ -33,7 +33,12 @@ def send_album(user_id, message):
     if media:
         caption = build_caption(user_id)
         bot.send_media_group(ADMIN_ID, media)
-        bot.send_message(ADMIN_ID, caption, parse_mode="MarkdownV2")
+# ждём 1 секунду, чтобы Telegram не перепутал порядок
+import time
+time.sleep(1)
+bot.send_message(ADMIN_ID, build_caption(user_id), parse_mode="Markdown")
+
+        
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
