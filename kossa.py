@@ -1,30 +1,14 @@
 import telebot
-import gspread
-import os
-import json
-from oauth2client.service_account import ServiceAccountCredentials
 from flask import Flask
 from datetime import datetime
 import threading
 from telebot import types
-import psycopg2
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
-
-# Google Sheets setup через переменную окружения
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-google_creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
-if not google_creds_json:
-    raise Exception("GOOGLE_CREDENTIALS_JSON не задана!")
-creds_dict = json.loads(google_creds_json)
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-client = gspread.authorize(creds)
-sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1wjYkcXWUbfk6BBAnTaT80xP9M98K3upVSlugWC7Ddow/edit").sheet1
-
 
 user_photos = {}
 user_timers = {}
@@ -55,10 +39,6 @@ def start_message(message):
 def handle_photos(message):
     user_id = message.from_user.id
     file_id = message.photo[-1].file_id
-    username = message.from_user.username
-    first_name = message.from_user.first_name
-    last_name = message.from_user.last_name
-    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     user_photos.setdefault(user_id, []).append(file_id)
 
@@ -67,9 +47,6 @@ def handle_photos(message):
 
     user_timers[user_id] = threading.Timer(5.0, send_album, args=(user_id, message))
     user_timers[user_id].start()
-
-    # Google Sheets запись
-    sheet.append_row([user_id, username, first_name, last_name, file_id, timestamp])
 
 @app.route('/')
 def index():
@@ -81,4 +58,5 @@ def run_bot():
 if __name__ == '__main__':
     threading.Thread(target=run_bot).start()
     app.run(host='0.0.0.0', port=8080)
+
 
