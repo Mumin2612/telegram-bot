@@ -5,7 +5,6 @@ from flask import Flask
 from datetime import datetime
 import threading
 from telebot import types
-import psycopg2
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
@@ -19,21 +18,6 @@ creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", sco
 client = gspread.authorize(creds)
 sheet = client.open_by_url("https://docs.google.com/spreadsheets/d/1wjYkcXWUbfk6BBAnTaT80xP9M98K3upVSlugWC7Ddow/edit").sheet1
 
-# PostgreSQL setup
-conn = psycopg2.connect("postgresql://telegram_db_zoh4_user:IUOsy6VjxHcaBcZEC32AVMW0tWD7j4pp@dpg-d19vut15pdvs73a9q9f0-a.oregon-postgres.render.com/telegram_db_zoh4")
-cur = conn.cursor()
-cur.execute('''
-CREATE TABLE IF NOT EXISTS photos (
-    id SERIAL PRIMARY KEY,
-    user_id BIGINT,
-    username TEXT,
-    first_name TEXT,
-    last_name TEXT,
-    file_id TEXT,
-    timestamp TEXT
-)
-''')
-conn.commit()
 
 user_photos = {}
 user_timers = {}
@@ -77,12 +61,6 @@ def handle_photos(message):
     user_timers[user_id] = threading.Timer(5.0, send_album, args=(user_id, message))
     user_timers[user_id].start()
 
-    # PostgreSQL запись
-    cur.execute('''
-        INSERT INTO photos (user_id, username, first_name, last_name, file_id, timestamp)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    ''', (user_id, username, first_name, last_name, file_id, timestamp))
-    conn.commit()
 
     # Google Sheets запись
     sheet.append_row([user_id, username, first_name, last_name, file_id, timestamp])
