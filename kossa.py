@@ -15,10 +15,11 @@ user_timers = {}
 user_states = {}
 user_data = {}
 
-def build_caption(user_id, user_info):
-    username = user_info.get("username", "")
-    first_name = user_info.get("first_name", "")
-    last_name = user_info.get("last_name", "")
+def build_caption(user_id):
+    info = user_data.get(user_id, {})
+    first_name = info.get("first_name", "")
+    last_name = info.get("last_name", "")
+    username = info.get("username", "")
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     user_link = f"@{username}" if username else f"[профиль](tg://user?id={user_id})"
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
@@ -26,46 +27,31 @@ def build_caption(user_id, user_info):
 def send_album(user_id, message):
     media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos.get(user_id, [])]
     if media:
-        caption = build_caption(user_id, user_data[user_id])
-   def send_album(user_id, message):
-    media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos.get(user_id, [])]
-
-    if media:
-        user_info = {
-            "username": message.from_user.username or "",
-            "first_name": message.from_user.first_name or user_names.get(user_id, ""),
-            "last_name": message.from_user.last_name or "",
-        }
-        caption = build_caption(user_id, user_info)
+        caption = build_caption(user_id)
         bot.send_media_group(ADMIN_ID, media)
         bot.send_message(ADMIN_ID, caption, parse_mode="Markdown")
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
-
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
     user_states.pop(user_id, None)
-    user_names.pop(user_id, None)  # ← исправил имя словаря, было user_data
+    user_data.pop(user_id, None)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
     user_id = message.from_user.id
-    username = message.from_user.username or ""
-    user_data[user_id] = {
-        "username": username,
-        "first_name": "",
-        "last_name": ""
-    }
-    user_states[user_id] = 'waiting_for_name'
     bot.send_message(user_id, "👋 Привет! Напиши, пожалуйста, своё имя и фамилию перед отправкой фото.")
+    user_states[user_id] = 'waiting_for_name'
+    user_data[user_id] = {
+        "username": message.from_user.username or "",
+        "telegram_id": user_id
+    }
 
 @bot.message_handler(func=lambda message: user_states.get(message.from_user.id) == 'waiting_for_name')
 def save_name(message):
     user_id = message.from_user.id
-    name_parts = message.text.strip().split()
-    first_name = name_parts[0] if len(name_parts) > 0 else ""
-    last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
-    if user_id not in user_data:
-        user_data[user_id] = {"username": message.from_user.username or ""}
+    name_parts = message.text.strip().split(" ", 1)
+    first_name = name_parts[0]
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
     user_data[user_id]["first_name"] = first_name
     user_data[user_id]["last_name"] = last_name
     user_states[user_id] = 'ready_for_photos'
@@ -98,6 +84,7 @@ def run_bot():
 if __name__ == '__main__':
     threading.Thread(target=run_bot).start()
     app.run(host='0.0.0.0', port=8080)
+
 
 
 
