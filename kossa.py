@@ -29,17 +29,21 @@ def build_caption(user_id):
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
 
 def send_album(user_id, message):
-    media = [types.InputMediaPhoto(media=file_id) for file_id in user_photos.get(user_id, [])]
-    if media:
+    media_files = user_photos.get(user_id, [])
+    if media_files:
         caption = build_caption(user_id)
-        bot.send_media_group(ADMIN_ID, media)
-# ждём 1 секунду, чтобы Telegram не перепутал порядок
-import time
-time.sleep(1)
-bot.send_message(ADMIN_ID, build_caption(user_id), parse_mode="Markdown")
+        media_group = []
 
-        
+        for i, file_id in enumerate(media_files):
+            if i == 0:
+                media_group.append(types.InputMediaPhoto(media=file_id, caption=caption, parse_mode="Markdown"))
+            else:
+                media_group.append(types.InputMediaPhoto(media=file_id))
+
+        bot.send_media_group(ADMIN_ID, media_group)
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
+
+    # Очистка
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
     user_states.pop(user_id, None)
@@ -93,3 +97,4 @@ def run_bot():
 if __name__ == '__main__':
     threading.Thread(target=run_bot).start()
     app.run(host='0.0.0.0', port=8080)
+
