@@ -1,5 +1,6 @@
 import telebot
 from googleapiclient.discovery import build
+from telebot import types
 from flask import Flask
 from datetime import datetime
 import threading
