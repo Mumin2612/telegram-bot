@@ -1,4 +1,6 @@
-pyTelegramBotAPI==4.15.4
-flask
+pyTelegramBotAPI
+Flask
 gspread
 oauth2client
+google-api-python-client
+requests
