@@ -157,7 +157,7 @@ def handle_photos(message):
     if user_id in user_timers:
         user_timers[user_id].cancel()
 
-    user_timers[user_id] = threading.Timer(10.0, send_album, args=(user_id, message))
+    user_timers[user_id] = threading.Timer(5.0, send_album, args=(user_id, message))
     user_timers[user_id].start()
 
 # === Flask для Render ===
