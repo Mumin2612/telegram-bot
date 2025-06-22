@@ -35,7 +35,7 @@ def build_caption(user_id):
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     user_link = f"@{username}" if username else f"[профиль](tg://user?id={user_id})"
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
-
+    
 def send_album(user_id, message):
     info = user_data.get(user_id, {})
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -58,11 +58,11 @@ def send_album(user_id, message):
         bot.send_media_group(ADMIN_ID, media_group)
         bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
 
-    # Очистка
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
     user_states.pop(user_id, None)
     user_data.pop(user_id, None)
+
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
