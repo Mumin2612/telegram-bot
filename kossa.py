@@ -30,7 +30,7 @@ scope = [
 ]
 creds = ServiceAccountCredentials.from_json_keyfile_name("certain-axis-463420-b5-1f4f58ac6291.json", scope)
 client = gspread.authorize(creds)
-sheet = client.open("telegram-bot-sheets").sheet1
+sheet = client.open("Фактуры").sheet1
 
 drive_service = build("drive", "v3", credentials=creds)
 
