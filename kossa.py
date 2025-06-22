@@ -6,8 +6,6 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from telebot import types
 
-
-
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
 
@@ -18,16 +16,15 @@ user_photos = {}
 user_timers = {}
 user_states = {}
 user_data = {}
+
+# Авторизация в Google Sheets
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("certain-axis-463420-b5-1f4f58ac6291.json", scope)
 client = gspread.authorize(creds)
-
-# Открой нужную таблицу по названию
 sheet = client.open("telegram-bot-sheets").sheet1
 
-
 def escape_markdown(text):
-    escape_chars = r"_*[]()~`>#+-=|{}.!"
+    escape_chars = r"_*[]()~`>#+-=|{}.!\\"
     return ''.join(['\\' + char if char in escape_chars else char for char in text])
 
 def build_caption(user_id):
@@ -41,11 +38,11 @@ def build_caption(user_id):
 
 def send_album(user_id, message):
     info = user_data.get(user_id, {})
-timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-first_name = info.get("first_name", "")
-last_name = info.get("last_name", "")
-username = info.get("username", "")
-sheet.append_row([first_name, last_name, username, user_id, timestamp])
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    first_name = info.get("first_name", "")
+    last_name = info.get("last_name", "")
+    username = info.get("username", "")
+    sheet.append_row([first_name, last_name, username, str(user_id), timestamp])
 
     media_files = user_photos.get(user_id, [])
     if media_files:
