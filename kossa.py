@@ -165,7 +165,7 @@ def handle_photos(message):
         if user_id in user_timers:
             user_timers[user_id].cancel()
 
-        user_timers[user_id] = threading.Timer(5.0, send_album, args=(user_id, message))
+        user_timers[user_id] = threading.Timer(3.0, send_album, args=(user_id, message))
         user_timers[user_id].start()
     except Exception as e:
         notify_admin_error(message.from_user.id, message.from_user.username, f"Ошибка при приёме фото: {str(e)}")
