@@ -21,7 +21,7 @@ user_data = {}
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("certain-axis-463420-b5-1f4f58ac6291.json", scope)
 client = gspread.authorize(creds)
-sheet = client.open("telegram-bot-sheets").sheet1
+sheet = client.open("Фактуры").sheet1
 
 def escape_markdown(text):
     escape_chars = r"_*[]()~`>#+-=|{}.!\\"
