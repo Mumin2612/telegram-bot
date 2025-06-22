@@ -6,7 +6,6 @@ import os
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
 import requests
