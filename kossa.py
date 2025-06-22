@@ -3,6 +3,9 @@ from flask import Flask
 from datetime import datetime
 import threading
 from telebot import types
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
 
 TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
@@ -14,6 +17,13 @@ user_photos = {}
 user_timers = {}
 user_states = {}
 user_data = {}
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("certain-axis-463420-b5-1f4f58ac6291.json", scope)
+client = gspread.authorize(creds)
+
+# Открой нужную таблицу по названию
+sheet = client.open("telegram-bot-sheets").sheet1
+
 
 def escape_markdown(text):
     escape_chars = r"_*[]()~`>#+-=|{}.!"
@@ -29,6 +39,13 @@ def build_caption(user_id):
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
 
 def send_album(user_id, message):
+    info = user_data.get(user_id, {})
+timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+first_name = info.get("first_name", "")
+last_name = info.get("last_name", "")
+username = info.get("username", "")
+sheet.append_row([first_name, last_name, username, user_id, timestamp])
+
     media_files = user_photos.get(user_id, [])
     if media_files:
         caption = build_caption(user_id)
