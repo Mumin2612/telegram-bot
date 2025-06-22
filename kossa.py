@@ -51,6 +51,7 @@ def build_caption(user_id):
     return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
 
 # === Отправка альбома и запись в Google Таблицу ===
+
 def send_album(user_id, message):
     info = user_data.get(user_id, {})
     first_name = info.get("first_name", "")
@@ -63,40 +64,62 @@ def send_album(user_id, message):
     drive_links = []
 
     for i, file_id in enumerate(media_files):
-        file_info = bot.get_file(file_id)
-        file_url = f'https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}'
-        file_content = requests.get(file_url).content
+        try:
+            # Сохраняем оригинальный file_id для отправки в Telegram
+            # Загружаем фото с Telegram
+            file_info = bot.get_file(file_id)
+            file_url = f'https://api.telegram.org/file/bot{TOKEN}/{file_info.file_path}'
+            file_content = requests.get(file_url).content
 
-        file_stream = io.BytesIO(file_content)
-        media = MediaIoBaseUpload(file_stream, mimetype='image/jpeg')
-        file_metadata = {
-            'name': f'{first_name}_{last_name}_{timestamp.replace(" ", "_")}_{i+1}.jpg',
-            'parents': [GOOGLE_FOLDER_ID]
-        }
+            # Загружаем на Google Drive
+            file_stream = io.BytesIO(file_content)
+            media = MediaIoBaseUpload(file_stream, mimetype='image/jpeg')
+            file_metadata = {
+                'name': f'{first_name}_{last_name}_{timestamp.replace(" ", "_")}_{i+1}.jpg',
+                'parents': [GOOGLE_FOLDER_ID]
+            }
 
-        uploaded_file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-        file_id_on_drive = uploaded_file.get('id')
-        drive_link = f'https://drive.google.com/file/d/{file_id_on_drive}/view?usp=sharing'
-        drive_links.append(drive_link)
+            uploaded_file = drive_service.files().create(
+                body=file_metadata,
+                media_body=media,
+                fields='id'
+            ).execute()
 
-        if i == 0:
-            media_group.append(types.InputMediaPhoto(media=file_id, caption=build_caption(user_id), parse_mode="Markdown"))
+            file_id_on_drive = uploaded_file.get('id')
+            drive_link = f'https://drive.google.com/file/d/{file_id_on_drive}/view?usp=sharing'
+            drive_links.append(drive_link)
+
+            # Готовим альбом для Telegram
+            if i == 0:
+                media_group.append(types.InputMediaPhoto(media=file_id, caption=build_caption(user_id), parse_mode="Markdown"))
+            else:
+                media_group.append(types.InputMediaPhoto(media=file_id))
+
+        except Exception as e:
+            print(f"Ошибка обработки фото {i+1}: {e}")
+
+    try:
+        # Отправка в ТГ
+        if media_group:
+            bot.send_media_group(ADMIN_ID, media_group)
+            bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
         else:
-            media_group.append(types.InputMediaPhoto(media=file_id))
+            bot.send_message(user_id, "⚠️ Не удалось отправить фото администратору.")
 
-    # Отправка в ТГ
-    bot.send_media_group(ADMIN_ID, media_group)
-    bot.send_message(user_id, "✅ Спасибо! Фото отправлены.")
+        # Запись в Google Таблицу
+        for link in drive_links:
+            sheet.append_row([first_name, last_name, username, user_id, timestamp, link])
 
-    # Сохранение в Google Таблицу
-    for link in drive_links:
-        sheet.append_row([first_name, last_name, username, user_id, timestamp, link])
+    except Exception as e:
+        print(f"Ошибка при отправке альбома или записи в таблицу: {e}")
+        bot.send_message(user_id, "⚠️ Произошла ошибка при отправке фото или записи в таблицу.")
 
     # Очистка
     user_photos.pop(user_id, None)
     user_timers.pop(user_id, None)
     user_states.pop(user_id, None)
     user_data.pop(user_id, None)
+
 
 # === Хендлеры ===
 @bot.message_handler(commands=['start'])
