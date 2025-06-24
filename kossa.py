@@ -117,7 +117,6 @@ def send_album(user_id, message):
         user_photos.pop(user_id, None)
         user_timers.pop(user_id, None)
         user_states.pop(user_id, None)
-        user_data.pop(user_id, None)
 
     except Exception as e:
         notify_admin_error(user_id, user_data.get(user_id, {}).get("username", ""), f"Ошибка в send_album: {str(e)}")
