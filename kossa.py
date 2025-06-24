@@ -154,7 +154,8 @@ def handle_photos(message):
     try:
         user_id = message.from_user.id
 
-        if user_states.get(user_id) != 'ready_for_photos':
+        info = user_data.get(user_id)
+        if not info or "first_name" not in info or "last_name" not in info:
             bot.send_message(user_id, "Сначала напиши своё имя и фамилию. Отправь /start.")
             return
 
@@ -168,6 +169,7 @@ def handle_photos(message):
         user_timers[user_id].start()
     except Exception as e:
         notify_admin_error(message.from_user.id, message.from_user.username, f"Ошибка при приёме фото: {str(e)}")
+
 
 # === Flask для Render ===
 @app.route('/')
