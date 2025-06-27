@@ -23,6 +23,7 @@ user_photos = {}
 user_timers = {}
 user_states = {}
 user_data = {}
+received_file_ids = {}  # Для проверки дубликатов по каждому user_id
 
 # === Google API настройка ===
 scope = [
@@ -54,7 +55,7 @@ def build_caption(user_id):
     username = escape_markdown(info.get("username", ""))
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     user_link = f"@{username}" if username else f"[профиль](tg://user?id={user_id})"
-    return f"📸 Новые фото\n👤 Имя: {first_name} {last_name}\n🔗 {user_link}\n🆔 ID: {user_id}\n🕒 Время: {timestamp}"
+    return f"\ud83d\udcf8 Новые фото\n\ud83d\udc64 Имя: {first_name} {last_name}\n\ud83d\udd17 {user_link}\n\ud83c\udd94 ID: {user_id}\n\ud83d\udd52 Время: {timestamp}"
 
 # === Отправка альбома и запись в Google Таблицу ===
 def send_album(user_id, message):
@@ -117,6 +118,7 @@ def send_album(user_id, message):
         user_photos.pop(user_id, None)
         user_timers.pop(user_id, None)
         user_states.pop(user_id, None)
+        received_file_ids.pop(user_id, None)
 
     except Exception as e:
         notify_admin_error(user_id, user_data.get(user_id, {}).get("username", ""), f"Ошибка в send_album: {str(e)}")
@@ -160,6 +162,13 @@ def handle_photos(message):
             return
 
         file_id = message.photo[-1].file_id
+        received_file_ids.setdefault(user_id, set())
+
+        if file_id in received_file_ids[user_id]:
+            bot.send_message(user_id, "⚠️ Это фото уже было отправлено ранее.")
+            return
+
+        received_file_ids[user_id].add(file_id)
         user_photos.setdefault(user_id, []).append(file_id)
 
         if user_id in user_timers:
@@ -169,7 +178,6 @@ def handle_photos(message):
         user_timers[user_id].start()
     except Exception as e:
         notify_admin_error(message.from_user.id, message.from_user.username, f"Ошибка при приёме фото: {str(e)}")
-
 
 # === Flask для Render ===
 @app.route('/')
@@ -182,4 +190,5 @@ def run_bot():
 if __name__ == '__main__':
     threading.Thread(target=run_bot).start()
     app.run(host='0.0.0.0', port=8080)
+
 
