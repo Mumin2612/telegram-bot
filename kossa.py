@@ -122,11 +122,11 @@ def handle_photo(message):
             bot.send_message(user_id, "⛔ Такое фото уже отправляли.")
             return
         photo_hashes.add(content_hash)
-        mime_type = requests.head(file_url).headers.get("Content-Type", "")
-        if "image" not in mime_type:
-            bot.send_message(user_id, "⛔ Только фото чеков/фактуры.")
-            return
+        if not file_info.file_path.lower().endswith((".jpg", ".jpeg", ".png")):
+    bot.send_message(user_id, "⛔ Только фото чеков/фактуры.")
+    return
 
+        
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         full_name = f"{info['first_name']} {info['last_name']}"
         folder_id = get_or_create_driver_folder(FOLDER_IDS[info['company']], full_name)
