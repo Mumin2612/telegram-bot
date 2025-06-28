@@ -1,16 +1,13 @@
-==> Deploying...
-==> Running 'python kossa.py'
-Traceback (most recent call last):
-  File "/opt/render/project/src/kossa.py", line 24, in <module>
-    service_account_info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
-  File "/usr/local/lib/python3.13/json/__init__.py", line 346, in loads
-    return _default_decoder.decode(s)
-           ~~~~~~~~~~~~~~~~~~~~~~~^^^
-  File "/usr/local/lib/python3.13/json/decoder.py", line 345, in decode
-    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
-               ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.13/json/decoder.py", line 363, in raw_decode
-    raise JSONDecodeError("Expecting value", s, err.value) from None
-json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
-     ==> Exited with status 1
-     ==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+{
+  "type": "service_account",
+  "project_id": "telegrambot-463419",
+  "private_key_id": "2dccdb710642bd0e621a893f86a7b41d31dafccd",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCrJx5vLHtGdn3o\n16ehdzU8azt9/mQopv/uHf8OIQhcbxZr6BD0cEdYhT9cHeBUxDtfq01iCKXxOgQ0\nhGdK1DWuo6cvW/fxqvhrwkSW2PqrFvd0yBOusjlLAHmniqguBWLQIObRg6uad3KL\nUdQhlSPa3fDsxUMhI957Z9QaJ6QqdIiXXS3KvWipjhqtS9YfrpJl5EbHd1SkppL0\nsEaZaYOFssyvpgRd5aDFOGF7Ci6xuf0ykz35XKu4rOueNJ7zZ69W4bmPLcIdA6h8\ngkEJHW+Ypg8M+AtoILGWzrWihmICJ6jB0xiOsjuAo7t5Mk3zaQiwnVOm9XuNeGyL\nh6PzVPspAgMBAAECggEAHiMhRMo8Wsf6m8l9hv0KrrzjGOh2koH1huRZSQ+f/UbC\nV/XhJmmu5nNwGLRaEBMNsWbklWKYdcWVf/nghlifq0S956T2H+PPIopusXE7kmzU\n3gdtD9HqLL7ErS/JNXFVWPiyLCpXSTfHP6kFBXTRf3SdO9PwYiGCx5Ac1Q4t5hud\nF+5NvNEtSksXJKBdmDIS2cCW462jbgfCBICWCgJ+xAuX45FAJ2HvLh/ggTw/53D7\n1k/WekJj+5rZOqHytXiwckVw/4/sdWlRauNbOJyrWWboCk91bRlZ/40wP89TRcie\notm4o7J+zLDYvH+Z+KQljIL41iOj3YrzIL8qOTv0kQKBgQDhJpiHeK+kGZkMNZx7\n/AaTn5yUR5PBnpbub5eYgWs4a0msvA0IUngdy2iVH9aGXDuMRPf4gnSlIkW5H1ph\n0vjlkXvv/WBQCV7slN6KRCOa8hJpCeaEtdmYTOHt3lSzy2ct7swRyFfFTw0J+iPU\nGmj0EQlrBfLZ9hx3UV8OlcjlbwKBgQDCmnymEuYOfX3xR7C4+//GboijDcOmSVcS\nuQmJ68qh6xAJV8ECmNMlF9MzWkw2OlJEZh2a9VWQQnxi6XD4MU5Ex9ceM0eLVie7\ni5q0dolnjLRyyPVQd4/4WR3a6TS3xct5PSV5TM5LQ5wTEyXCKUIjsZRSjb6G8c5p\nNdkwSZ9M5wKBgQDI8ONMdL99G4NmTCqe1O0hr1/VTpRmRx25K0sGxupkbgxQ53xS\nIxgkrzdlcAbL32Ed7SfKWNO11YKYl4zYpauRZ2hPZbkhdVuMlciPagTE8qrPqBBd\n/NZ4gJVa8AR0emJZsjfa3wzGgajHcMGtOOzWdqYLKEH3mRkKvEqz/6ZObQKBgEkh\nLP5r07BWUGG/gxXA/VlgaFB996whm2sZxg/iX/+BCkG4jHuhWpdx4JhHsqQePpQd\nm7qDv2e61GuHNkDOpo8KWjirJJOkCMJdsAFpGjGjmpwYELfwdlXph2KgiIMW/WPO\nKqruxgdanOg+Jc5VGtm2/foX8iVb8SlwZvHSeN65AoGAQe12fE267gyHlMfzXEFB\nYYxKcgiYwH2Vqo96zMR7gkWRF8uCaXGVoAWazvAfSPwhd/0jWeaTGY8nunp65mXR\nRhDtWHuV0mTn6d9gk2SSP+SKGIPUy982h3he4sspP8C+zmc/VdHiVBMsyyBngV5n\nEtT6fDr9krCeCbIqsiK24fo=\n-----END PRIVATE KEY-----\n",
+  "client_email": "telegrambot-service@telegrambot-463419.iam.gserviceaccount.com",
+  "client_id": "117111189231269201498",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/telegrambot-service%40telegrambot-463419.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
