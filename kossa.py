@@ -10,153 +10,152 @@ import schedule
 import gspread
 from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
-from googleapiclient.http import MediaFileUpload
 
 TOKEN = os.getenv("BOT_TOKEN") or "8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A"
 ADMIN_ID = 7889110301
-SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
-PARENT_FOLDERS = {
+WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
+DRIVE_PARENT_FOLDER = {
     "KOSA": "1u1-F8I6cLNdbWQzbQbU4ujD7s2DqeFkv",
     "ALFATTAH": "1RhO9MimAvO89T9hkSyWgd0wT0zg7n1RV",
     "SUNBUD": "1vTLWnBDOKIbVpg4isM283leRkhJ8sHKS"
 }
-
-WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
-
-creds = Credentials.from_service_account_file('certain-axis-463420-b5-1f4f58ac6291.json', scopes=SCOPES)
-client = gspread.authorize(creds)
-sheet = client.open("Фактуры").sheet1
+SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
+creds = Credentials.from_service_account_file('telegrambot-463419-2dccdb710642.json', scopes=SCOPES)
+gsheet = gspread.authorize(creds)
+sheet = gsheet.open("Фактуры").sheet1
 drive_service = build('drive', 'v3', credentials=creds)
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-user_states = {}
-photo_buffers = {}
+user_data = {}
+user_photos = {}
+last_upload_time = {}
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['POST', 'GET'])
 def webhook():
     if request.method == 'POST':
-        json_string = request.get_data().decode('utf-8')
-        update = telebot.types.Update.de_json(json_string)
+        update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
         bot.process_new_updates([update])
-        return '!', 200
+        return 'OK', 200
     else:
         bot.remove_webhook()
         bot.set_webhook(url=WEBHOOK_URL)
-        return 'Webhook set!', 200
+        return 'Webhook set', 200
 
 @bot.message_handler(commands=['start'])
-def handle_start(message):
-    user_states[message.from_user.id] = {}
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-    for company in PARENT_FOLDERS.keys():
-        markup.add(types.KeyboardButton(company))
-    bot.send_message(message.chat.id, "Выберите Spółkę:", reply_markup=markup)
+def send_welcome(message):
+    bot.send_message(message.chat.id, "Привет! Введи своё имя и фамилию:")
+    user_data[message.chat.id] = {'step': 'name'}
 
-@bot.message_handler(func=lambda m: m.text in PARENT_FOLDERS.keys())
-def handle_company_selection(message):
-    user_id = message.from_user.id
-    user_states[user_id]["company"] = message.text
-    bot.send_message(message.chat.id, "Введите своё имя и фамилию:")
+@bot.message_handler(func=lambda msg: msg.chat.id in user_data and user_data[msg.chat.id]['step'] == 'name')
+def get_name(msg):
+    user_data[msg.chat.id]['name'] = msg.text.strip()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("KOSA", "ALFATTAH", "SUNBUD")
+    bot.send_message(msg.chat.id, "Выбери свою Spółkę:", reply_markup=markup)
+    user_data[msg.chat.id]['step'] = 'spolka'
 
-@bot.message_handler(func=lambda m: True, content_types=['text'])
-def handle_name(message):
-    user_id = message.from_user.id
-    if "company" in user_states.get(user_id, {}):
-        user_states[user_id]["name"] = message.text.strip()
-        bot.send_message(message.chat.id, "Отправьте фото фактуры (можно несколько).")
-    else:
-        bot.send_message(message.chat.id, "Сначала нажмите /start и выберите Spółkę.")
+@bot.message_handler(func=lambda msg: msg.chat.id in user_data and user_data[msg.chat.id]['step'] == 'spolka')
+def get_spolka(msg):
+    if msg.text not in DRIVE_PARENT_FOLDER:
+        bot.send_message(msg.chat.id, "Пожалуйста, выбери одну из кнопок: KOSA, ALFATTAH или SUNBUD")
+        return
+    user_data[msg.chat.id]['spolka'] = msg.text
+    user_data[msg.chat.id]['step'] = 'done'
+    bot.send_message(msg.chat.id, "Теперь можешь отправлять фото-фактуры!", reply_markup=types.ReplyKeyboardRemove())
 
 @bot.message_handler(content_types=['photo'])
-def handle_photos(message):
-    user_id = message.from_user.id
-    state = user_states.get(user_id, {})
-    if "name" not in state or "company" not in state:
-        bot.send_message(message.chat.id, "Сначала нажмите /start, выберите Spółkę и введите имя.")
+def handle_photo(message):
+    if message.chat.id not in user_data or user_data[message.chat.id].get('step') != 'done':
+        bot.send_message(message.chat.id, "Сначала напиши /start и введи данные")
         return
 
-    if user_id not in photo_buffers:
-        photo_buffers[user_id] = []
-    photo_buffers[user_id].append(message)
+    user_photos.setdefault(message.chat.id, []).append(message.photo[-1].file_id)
+    last_upload_time[message.chat.id] = time.time()
 
-    state["last_photo_time"] = time.time()
-
-@bot.message_handler(content_types=['document', 'video', 'audio', 'voice', 'sticker'])
-def reject_unsupported(message):
-    bot.send_message(message.chat.id, "⛔ Только фото чеков/фактуры.")
+@bot.message_handler(func=lambda m: True)
+def reset_state(m):
+    if m.chat.id not in user_data:
+        bot.send_message(m.chat.id, "Напиши /start чтобы начать")
 
 
-def check_and_send_albums():
-    now = time.time()
-    for user_id in list(photo_buffers):
-        state = user_states.get(user_id, {})
-        if "last_photo_time" in state and now - state["last_photo_time"] > 5:
-            messages = photo_buffers.pop(user_id, [])
-            if not messages:
-                continue
+def upload_photos_periodically():
+    while True:
+        now = time.time()
+        for uid, photos in list(user_photos.items()):
+            if photos and now - last_upload_time.get(uid, now) > 5:
+                try:
+                    upload_photos(uid, photos)
+                    user_photos[uid] = []
+                except Exception as e:
+                    bot.send_message(ADMIN_ID, f"Ошибка при загрузке фото: {e}")
+        time.sleep(2)
 
-            try:
-                name = state["name"]
-                company = state["company"]
-                folder_id = get_or_create_driver_folder(company, name)
-                media_group = []
-                file_links = []
+def upload_photos(uid, file_ids):
+    user = user_data[uid]
+    name = user['name']
+    spolka = user['spolka']
+    username = f"@{bot.get_chat(uid).username}" if bot.get_chat(uid).username else "-"
+    user_id = uid
+    timestamp = datetime.now().strftime("%d.%m.%Y %H:%M")
 
-                for msg in messages:
-                    file_info = bot.get_file(msg.photo[-1].file_id)
-                    file_path = file_info.file_path
-                    file_name = f"{msg.photo[-1].file_id}.jpg"
-                    downloaded_file = bot.download_file(file_path)
-                    with open(file_name, 'wb') as f:
-                        f.write(downloaded_file)
+    folder_id = get_or_create_folder(name, DRIVE_PARENT_FOLDER[spolka])
+    links = []
+    media = []
 
-                    file_metadata = {
-                        'name': file_name,
-                        'parents': [folder_id]
-                    }
-                    media = MediaFileUpload(file_name, resumable=True)
-                    uploaded = drive_service.files().create(body=file_metadata, media_body=media, fields='id, webViewLink').execute()
-                    file_links.append(uploaded['webViewLink'])
-                    media_group.append(types.InputMediaPhoto(open(file_name, 'rb')))
-
-                caption = f"👤 {name}\n🆔 {user_id}\n🏢 {company}\n🕒 {datetime.now().strftime('%d.%m.%Y %H:%M')}"
-                bot.send_media_group(ADMIN_ID, media_group)
-
-                for f in media_group:
-                    f.media.close()
-
-                sheet.append_row([name, user_id, company, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ", ".join(file_links)])
-
-            except Exception as e:
-                bot.send_message(ADMIN_ID, f"❗ Ошибка при отправке фото: {e}")
-
-
-def get_or_create_driver_folder(company, name):
-    parent_id = PARENT_FOLDERS[company]
-    query = f"'{parent_id}' in parents and name = '{name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    results = drive_service.files().list(q=query, fields="files(id, name)").execute()
-    folders = results.get("files", [])
-    if folders:
-        return folders[0]['id']
-    else:
+    for file_id in file_ids:
+        file = bot.get_file(file_id)
+        downloaded = bot.download_file(file.file_path)
+        file_name = f"{name}_{file_id[-6:]}.jpg"
         file_metadata = {
-            'name': name,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [parent_id]
+            'name': file_name,
+            'parents': [folder_id]
         }
-        file = drive_service.files().create(body=file_metadata, fields='id').execute()
-        return file['id']
+        media_body = {'name': file_name, 'mimeType': 'image/jpeg'}
+        media_upload = drive_service.files().create(media_body=file_metadata, media=googleapiclient.http.MediaIoBaseUpload(io.BytesIO(downloaded), mimetype='image/jpeg')).execute()
+        file_link = f"https://drive.google.com/file/d/{media_upload['id']}/view"
+        links.append(file_link)
+        media.append(types.InputMediaPhoto(media=file_id))
 
+    caption = f"Имя: {name}\nUser: {username}\nID: {user_id}\nSpółka: {spolka}\nВремя: {timestamp}"
+    bot.send_media_group(ADMIN_ID, media)
+    sheet.append_row([name, username, user_id, spolka, timestamp, *links])
+
+def get_or_create_folder(folder_name, parent_id):
+    query = f"'{parent_id}' in parents and name = '{folder_name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results = drive_service.files().list(q=query, spaces='drive').execute()
+    if results['files']:
+        return results['files'][0]['id']
+    folder_metadata = {
+        'name': folder_name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_id]
+    }
+    folder = drive_service.files().create(body=folder_metadata, fields='id').execute()
+    return folder['id']
+
+def check_reminders():
+    try:
+        records = sheet.get_all_records()
+        now = datetime.now()
+        reminded = set()
+        for row in records[::-1]:
+            uid = row['user_id']
+            date_str = row['дата'] if 'дата' in row else row['timestamp']
+            dt = datetime.strptime(date_str, "%d.%m.%Y %H:%M")
+            if (now - dt).days > 14 and uid not in reminded:
+                reminded.add(uid)
+                bot.send_message(uid, "Напоминаем: вы не отправляли фактуру более 14 дней")
+                bot.send_message(ADMIN_ID, f"{row['имя']} не отправлял фактуру более 14 дней")
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"Ошибка при проверке напоминаний: {e}")
+
+schedule.every().day.at("09:00").do(check_reminders)
 
 if __name__ == '__main__':
-    def run_schedule():
-        while True:
-            schedule.run_pending()
-            time.sleep(1)
-
-    threading.Thread(target=run_schedule).start()
+    threading.Thread(target=upload_photos_periodically).start()
+    threading.Thread(target=lambda: schedule.run_pending()).start()
     app.run(host='0.0.0.0', port=8080)
 
 
