@@ -21,9 +21,8 @@ DRIVE_PARENT_FOLDER = {
 }
 SCOPES = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 import io
-service_account_info = json.loads(os.environ["GOOGLE_CREDENTIALS_JSON"])
+creds = Credentials.from_service_account_file("telegrambot-463419-2dccdb710642.json", scopes=SCOPES)
 creds = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
-
 gsheet = gspread.authorize(creds)
 sheet = gsheet.open("Фактуры").sheet1
 drive_service = build('drive', 'v3', credentials=creds)
