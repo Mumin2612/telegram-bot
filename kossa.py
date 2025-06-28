@@ -12,7 +12,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 # 🔐 Конфигурация
-TOKEN = 'твой_токен_бота'
+TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
 FOLDER_IDS = {
     'KOSA': '1u1-F8I6cLNdbWQzbQbU4ujD7s2DqeFkv',
