@@ -162,6 +162,7 @@ def send_album(user_id, photos):
     sheet.append_row([
         first_name, last_name, username, tg_id, now_str, company, ", ".join(drive_links)
     ])
+    bot.send_message(tg_id, "✅ Фото доставлены! Спасибо 📬")
 
 def get_or_create_folder(name, parent_id):
     query = f"'{parent_id}' in parents and name = '{name}' and mimeType = 'application/vnd.google-apps.folder'"
