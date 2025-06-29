@@ -17,6 +17,7 @@ from googleapiclient.http import MediaFileUpload
 
 import schedule
 
+# ==== НАСТРОЙКИ ====
 BOT_TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
 ADMIN_ID = 7889110301
 SPREADSHEET_NAME = 'Фактуры'
@@ -25,12 +26,14 @@ FOLDER_IDS = {
     'ALFATTAH': '1RhO9MimAvO89T9hkSyWgd0wT0zg7n1RV',
     'SUNBUD': '1vTLWnBDOKIbVpg4isM283leRkhJ8sHKS'
 }
-WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
+WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'  # замените
 
 POLAND_TIME = timezone(timedelta(hours=2))
+
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
+# ==== Google Auth ====
 credentials = Credentials.from_service_account_info(
     json.loads(os.environ['GOOGLE_CREDENTIALS_JSON']),
     scopes=["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
@@ -39,12 +42,31 @@ gc = gspread.authorize(credentials)
 sheet = gc.open(SPREADSHEET_NAME).sheet1
 drive_service = build('drive', 'v3', credentials=credentials)
 
-user_data = {}
+# ==== JSON-файл с водителями ====
+USERS_FILE = 'users.json'
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_users(data):
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+users_data = load_users()
 photo_queue = {}
 photo_hashes = {}
 
+# ==== /start ====
 @bot.message_handler(commands=['start'])
 def start_handler(message):
+    user_id = str(message.chat.id)
+    if user_id in users_data:
+        bot.send_message(message.chat.id, "✅ Ты уже зарегистрирован. Можешь отправлять фото прямо сейчас 📸")
+        return
+
     user_data[message.chat.id] = {}
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     for company in ['KOSA', 'ALFATTAH', 'SUNBUD']:
@@ -53,18 +75,27 @@ def start_handler(message):
 
 @bot.message_handler(func=lambda msg: msg.text in FOLDER_IDS)
 def handle_company(msg):
-    user_data[msg.chat.id]['company'] = msg.text
+    user_data[msg.chat.id] = {'company': msg.text}
     bot.send_message(msg.chat.id, "✍️ Напиши своё *Имя и Фамилию*", parse_mode="Markdown")
 
-@bot.message_handler(func=lambda msg: 'company' in user_data.get(msg.chat.id, {}) and 'name' not in user_data.get(msg.chat.id, {}))
+@bot.message_handler(func=lambda msg: msg.chat.id in user_data and 'name' not in user_data[msg.chat.id])
 def handle_name(msg):
-    user_data[msg.chat.id]['name'] = msg.text
-    bot.send_message(msg.chat.id, "📸 Теперь отправь фото фактуры (можно несколько подряд)")
+    user_id = str(msg.chat.id)
+    name = msg.text.strip()
+    company = user_data[msg.chat.id]['company']
+    users_data[user_id] = {
+        'name': name,
+        'spolka': company
+    }
+    save_users(users_data)
+    bot.send_message(msg.chat.id, "✅ Данные сохранены! Теперь можешь отправлять фото 📸")
 
+# ==== Обработка фото ====
 @bot.message_handler(content_types=['photo'])
 def handle_photo(msg):
-    if 'name' not in user_data.get(msg.chat.id, {}):
-        bot.send_message(msg.chat.id, "⚠️ Сначала введи /start, выбери Spółkę и своё имя.")
+    user_id = str(msg.chat.id)
+    if user_id not in users_data:
+        bot.send_message(msg.chat.id, "⚠️ Напиши /start и введи свои данные.")
         return
 
     file_id = msg.photo[-1].file_id
@@ -72,35 +103,36 @@ def handle_photo(msg):
     downloaded = bot.download_file(file_info.file_path)
 
     file_hash = hashlib.md5(downloaded).hexdigest()
-    user_hashes = photo_hashes.setdefault(msg.chat.id, set())
-
+    user_hashes = photo_hashes.setdefault(user_id, set())
     if file_hash in user_hashes:
         bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее и не будет загружено повторно.")
         return
-
     user_hashes.add(file_hash)
-    queue = photo_queue.setdefault(msg.chat.id, {'photos': [], 'last_time': None})
+
+    queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
     queue['photos'].append((file_id, msg, file_hash, downloaded))
     queue['last_time'] = datetime.now(POLAND_TIME)
 
+# ==== Отправка альбома ====
 def photo_watcher():
     while True:
         now = datetime.now(POLAND_TIME)
-        for chat_id, queue in list(photo_queue.items()):
+        for user_id, queue in list(photo_queue.items()):
             if queue['last_time'] and (now - queue['last_time']).total_seconds() >= 5:
                 try:
-                    send_album(chat_id, queue['photos'])
+                    send_album(user_id, queue['photos'])
                 except Exception as e:
                     bot.send_message(ADMIN_ID, f"❌ Ошибка при отправке альбома:\n{e}")
-                del photo_queue[chat_id]
+                del photo_queue[user_id]
         time.sleep(1)
 
-def send_album(chat_id, photos):
-    user = user_data[chat_id]
-    name = user['name']
-    company = user['company']
+def send_album(user_id, photos):
+    data = users_data[user_id]
+    name = data['name']
+    company = data['spolka']
+    first_name, last_name = name.strip().split(maxsplit=1) if " " in name else (name.strip(), "")
     username = photos[0][1].from_user.username or "—"
-    user_id = photos[0][1].from_user.id
+    tg_id = int(user_id)
     now = datetime.now(POLAND_TIME)
     now_str = now.strftime("%Y-%m-%d %H:%M")
 
@@ -120,57 +152,47 @@ def send_album(chat_id, photos):
         uploaded = drive_service.files().create(body=file_metadata, media_body=media_upload, fields='id').execute()
         drive_id = uploaded.get('id')
         drive_links.append(f"https://drive.google.com/file/d/{drive_id}/view")
-
         os.remove(local_path)
         media.append(types.InputMediaPhoto(file_id))
 
-    caption = f"📄 Имя: {name}\n🆔 ID: {user_id}\n👤 Username: @{username}\n📅 Дата: {now_str}\n🏢 Spółka: {company}"
+    caption = f"📄 Имя: {name}\n🆔 ID: {tg_id}\n👤 Username: @{username}\n📅 Дата: {now_str}\n🏢 Spółka: {company}"
     media[0].caption = caption
     bot.send_media_group(ADMIN_ID, media)
 
-    first_name, last_name = name.strip().split(maxsplit=1) if " " in name else (name.strip(), "")
-sheet.append_row([
-    first_name,           # Имя
-    last_name,            # Фамилия
-    username,             # Username
-    user_id,              # Telegram ID
-    now_str,              # Дата и Время
-    company,              # Spółka
-    ", ".join(drive_links)  # Фото (File ID)
-])
-
+    sheet.append_row([
+        first_name, last_name, username, tg_id, now_str, company, ", ".join(drive_links)
+    ])
 
 def get_or_create_folder(name, parent_id):
     query = f"'{parent_id}' in parents and name = '{name}' and mimeType = 'application/vnd.google-apps.folder'"
     result = drive_service.files().list(q=query, fields="files(id)").execute()
     if result['files']:
         return result['files'][0]['id']
-    else:
-        file_metadata = {
-            'name': name,
-            'mimeType': 'application/vnd.google-apps.folder',
-            'parents': [parent_id]
-        }
-        folder = drive_service.files().create(body=file_metadata, fields='id').execute()
-        return folder.get('id')
+    file_metadata = {
+        'name': name,
+        'mimeType': 'application/vnd.google-apps.folder',
+        'parents': [parent_id]
+    }
+    folder = drive_service.files().create(body=file_metadata, fields='id').execute()
+    return folder.get('id')
 
+# ==== Напоминания ====
 def check_reminders():
     try:
         rows = sheet.get_all_values()[1:]
         today = datetime.now(POLAND_TIME)
-
         warned_users = set()
 
         for row in rows:
-            name, user_id, username, date_str, company = row[:5]
+            first, last, username, user_id, date_str, company = row[:6]
             last_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
             delta = today - last_date
             if delta.days >= 14 and user_id not in warned_users:
                 warned_users.add(user_id)
                 bot.send_message(int(user_id), "⏰ Напоминание: вы не отправляли фактуру более 14 дней.")
-                bot.send_message(ADMIN_ID, f"🔔 {name} ({user_id}) не отправлял фактуру {delta.days} дней.")
+                bot.send_message(ADMIN_ID, f"🔔 {first} {last} ({user_id}) не отправлял фактуру {delta.days} дней.")
     except Exception as e:
-        bot.send_message(ADMIN_ID, f"❌ Ошибка в check_reminders:\n{e}")
+        bot.send_message(ADMIN_ID, f"❌ Ошибка в напоминании:\n{e}")
 
 def scheduler_loop():
     schedule.every().day.at("09:00").do(check_reminders)
@@ -178,16 +200,17 @@ def scheduler_loop():
         schedule.run_pending()
         time.sleep(60)
 
+# ==== Webhook ====
 @app.route('/', methods=['POST'])
 def webhook():
     try:
-        json_str = request.get_data().decode('UTF-8')
-        update = telebot.types.Update.de_json(json_str)
+        update = telebot.types.Update.de_json(request.get_data().decode('utf-8'))
         bot.process_new_updates([update])
     except Exception as e:
         bot.send_message(ADMIN_ID, f"❌ Ошибка webhook:\n{e}")
     return 'OK', 200
 
+# ==== Запуск ====
 if __name__ == '__main__':
     threading.Thread(target=photo_watcher, daemon=True).start()
     threading.Thread(target=scheduler_loop, daemon=True).start()
