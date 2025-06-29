@@ -44,6 +44,7 @@ def save_users(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 users_data = load_users()
+temp_user_data = {}
 photo_queue = {}
 photo_hashes = {}
 
@@ -67,7 +68,7 @@ def start_handler(message):
         bot.send_message(message.chat.id, "✅ Ты уже зарегистрирован. Можешь отправлять фото 📸")
         return
 
-    user_data[message.chat.id] = {}
+    temp_user_data[message.chat.id] = {}
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     for company in FOLDER_IDS.keys():
         markup.add(types.KeyboardButton(company))
@@ -75,14 +76,14 @@ def start_handler(message):
 
 @bot.message_handler(func=lambda msg: msg.text in FOLDER_IDS)
 def handle_company(msg):
-    user_data[msg.chat.id] = {'company': msg.text}
+    temp_user_data[msg.chat.id] = {'company': msg.text}
     bot.send_message(msg.chat.id, "✍️ Напиши своё *Имя и Фамилию*", parse_mode="Markdown")
 
-@bot.message_handler(func=lambda msg: msg.chat.id in user_data and 'name' not in user_data[msg.chat.id])
+@bot.message_handler(func=lambda msg: msg.chat.id in temp_user_data and 'name' not in temp_user_data[msg.chat.id])
 def handle_name(msg):
     user_id = str(msg.chat.id)
     name = msg.text.strip()
-    spolka = user_data[msg.chat.id]['company']
+    spolka = temp_user_data[msg.chat.id]['company']
     users_data[user_id] = {'name': name, 'spolka': spolka}
     save_users(users_data)
     bot.send_message(msg.chat.id, "✅ Данные сохранены. Можешь отправлять фото 📸")
@@ -211,7 +212,6 @@ if __name__ == '__main__':
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
     app.run(host='0.0.0.0', port=10000)
-
 
 
 
