@@ -128,7 +128,17 @@ def send_album(chat_id, photos):
     media[0].caption = caption
     bot.send_media_group(ADMIN_ID, media)
 
-    sheet.append_row([name, user_id, username, now_str, company, ", ".join(drive_links)])
+    first_name, last_name = name.strip().split(maxsplit=1) if " " in name else (name.strip(), "")
+sheet.append_row([
+    first_name,           # Имя
+    last_name,            # Фамилия
+    username,             # Username
+    user_id,              # Telegram ID
+    now_str,              # Дата и Время
+    company,              # Spółka
+    ", ".join(drive_links)  # Фото (File ID)
+])
+
 
 def get_or_create_folder(name, parent_id):
     query = f"'{parent_id}' in parents and name = '{name}' and mimeType = 'application/vnd.google-apps.folder'"
