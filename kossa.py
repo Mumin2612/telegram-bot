@@ -135,9 +135,9 @@ def send_album(user_id, photos):
     name = data['name']
     spolka = data['spolka']
     first_name, last_name = name.split(maxsplit=1) if " " in name else (name, "")
-    username = photos[0][1].from_user.username or "—"
+    username = photos[0][1].from_user.username
+    username_display = f"@{username}" if username else "—"
     tg_id = int(user_id)
-    bot.send_message(tg_id, "⏳ Фото получены. Обрабатываю... 🔄")
     now = datetime.now(POLAND_TIME)
     now_str = now.strftime("%Y-%m-%d %H:%M")
 
@@ -159,11 +159,22 @@ def send_album(user_id, photos):
         os.remove(path)
         media.append(types.InputMediaPhoto(file_id))
 
-    caption = f"📄 Имя: {name}\n🆔 ID: {tg_id}\n👤 @{username}\n📅 {now_str}\n🏢 {spolka}"
+    # Отправка альбома админу
+    caption = f"📄 Имя: {name}\n🆔 ID: {tg_id}\n👤 {username_display}\n📅 {now_str}\n🏢 {spolka}"
     media[0].caption = caption
     bot.send_media_group(ADMIN_ID, media)
 
-    sheet.append_row([first_name, last_name, username, tg_id, now_str, spolka, ", ".join(drive_links)])
+    # Запись в основной лист (Фактуры)
+    sheet.append_row([first_name, last_name, username or "—", tg_id, now_str, spolka, ", ".join(drive_links)])
+
+    # Запись в лист "Пользователи"
+    try:
+        users_sheet = gc.open(SPREADSHEET_NAME).worksheet("Пользователи")
+        users_sheet.append_row([tg_id, name, spolka])
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ Ошибка при записи пользователя в лист Пользователи:\n{e}")
+
+    # Ответ водителю
     bot.send_message(tg_id, "✅ Фото доставлены! Спасибо 📬")
 
 def get_or_create_folder(name, parent_id):
