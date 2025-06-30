@@ -25,7 +25,7 @@ FOLDER_IDS = {
     'ALFATTAH': '1RhO9MimAvO89T9hkSyWgd0wT0zg7n1RV',
     'SUNBUD': '1vTLWnBDOKIbVpg4isM283leRkhJ8sHKS'
 }
-WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'  # замени на свой URL
+WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
 
 # === ВРЕМЯ ===
 POLAND_TIME = timezone(timedelta(hours=2))
@@ -33,15 +33,21 @@ POLAND_TIME = timezone(timedelta(hours=2))
 # === ФАЙЛ ПОЛЬЗОВАТЕЛЕЙ ===
 USERS_FILE = 'users.json'
 
+# === ЗАГРУЗКА И СОХРАНЕНИЕ ===
 def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
+    try:
+        sheet_users = gc.open(SPREADSHEET_NAME).worksheet("Пользователи")
+        records = sheet_users.get_all_records()
+        return {str(row['user_id']): {'name': row['name'], 'spolka': row['spolka']} for row in records}
+    except Exception:
+        return {}
 
-def save_users(data):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def save_user_to_sheet(user_id, name, spolka):
+    try:
+        sheet_users = gc.open(SPREADSHEET_NAME).worksheet("Пользователи")
+        sheet_users.append_row([user_id, name, spolka])
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ Ошибка при записи пользователя в лист Пользователи: {e}")
 
 users_data = load_users()
 temp_user_data = {}
@@ -85,7 +91,7 @@ def handle_name(msg):
     name = msg.text.strip()
     spolka = temp_user_data[msg.chat.id]['company']
     users_data[user_id] = {'name': name, 'spolka': spolka}
-    save_users(users_data)
+    save_user_to_sheet(user_id, name, spolka)
     bot.send_message(msg.chat.id, "✅ Данные сохранены. Можешь отправлять фото 📸")
 
 # === ОБРАБОТКА ФОТО ===
@@ -131,6 +137,7 @@ def send_album(user_id, photos):
     first_name, last_name = name.split(maxsplit=1) if " " in name else (name, "")
     username = photos[0][1].from_user.username or "—"
     tg_id = int(user_id)
+    bot.send_message(tg_id, "⏳ Фото получены. Обрабатываю... 🔄")
     now = datetime.now(POLAND_TIME)
     now_str = now.strftime("%Y-%m-%d %H:%M")
 
@@ -212,6 +219,7 @@ if __name__ == '__main__':
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
     app.run(host='0.0.0.0', port=10000)
+
 
 
 
