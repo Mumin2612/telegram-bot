@@ -1,10 +1,11 @@
 Flask
 pyTelegramBotAPI
-pytesseract
-pillow
 gspread
+google-api-python-client
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
-google-api-python-client
+oauth2client
 schedule
+pillow
+pytesseract
