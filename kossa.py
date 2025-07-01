@@ -31,25 +31,8 @@ FOLDER_IDS = {
 WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
 
 POLAND_TIME = timezone(timedelta(hours=2))
-USERS_FILE = 'users.json'
-HASHES_FILE = 'photo_hashes.json'
 
-# === JSON ===
-def load_json(path):
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {}
-
-def save_json(path, data):
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-users_data = load_json(USERS_FILE)
-global_photo_hashes = load_json(HASHES_FILE)
-temp_user_data = {}
-photo_queue = {}
-
+# === ИНИЦИАЛИЗАЦИЯ ===
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
 
@@ -58,8 +41,35 @@ credentials = Credentials.from_service_account_info(
     scopes=["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
 )
 gc = gspread.authorize(credentials)
-sheet = gc.open(SPREADSHEET_NAME).sheet1
+sheet = gc.open(SPREADSHEET_NAME)
+sheet_users = sheet.worksheet("users")
+sheet_hashes = sheet.worksheet("hashes")
+sheet_main = sheet.sheet1
 drive_service = build('drive', 'v3', credentials=credentials)
+
+temp_user_data = {}
+photo_queue = {}
+
+# === ПОЛЬЗОВАТЕЛИ ===
+def load_users():
+    users = {}
+    rows = sheet_users.get_all_values()[1:]
+    for row in rows:
+        if len(row) >= 3:
+            users[row[0]] = {"name": row[1], "spolka": row[2]}
+    return users
+
+def save_user(user_id, name, spolka):
+    sheet_users.append_row([user_id, name, spolka])
+
+users_data = load_users()
+
+def photo_hash_exists(photo_hash):
+    hashes = sheet_hashes.col_values(1)
+    return photo_hash in hashes
+
+def save_photo_hash(photo_hash):
+    sheet_hashes.append_row([photo_hash])
 
 @bot.message_handler(commands=['start'])
 def start_handler(message):
@@ -84,8 +94,8 @@ def handle_name(msg):
     user_id = str(msg.chat.id)
     name = msg.text.strip()
     spolka = temp_user_data[msg.chat.id]['company']
+    save_user(user_id, name, spolka)
     users_data[user_id] = {'name': name, 'spolka': spolka}
-    save_json(USERS_FILE, users_data)
     bot.send_message(msg.chat.id, "✅ Данные сохранены. Можешь отправлять фото 📸")
 
 @bot.message_handler(content_types=['photo'])
@@ -106,13 +116,11 @@ def handle_photo(msg):
         return
 
     file_hash = hashlib.md5(file_data).hexdigest()
-    if file_hash in global_photo_hashes:
-        bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее другим пользователем.")
+    if photo_hash_exists(file_hash):
+        bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
         return
 
-    global_photo_hashes[file_hash] = user_id
-    save_json(HASHES_FILE, global_photo_hashes)
-
+    save_photo_hash(file_hash)
     bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
 
     queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
@@ -165,7 +173,7 @@ def send_album(user_id, photos):
     media[0].parse_mode = "Markdown"
     bot.send_media_group(ADMIN_ID, media)
 
-    sheet.append_row([first_name, last_name, username or "", tg_id, now_str, spolka, ", ".join(drive_links)])
+    sheet_main.append_row([first_name, last_name, username or "", tg_id, now_str, spolka, ", ".join(drive_links)])
     bot.send_message(tg_id, "✅ Фото доставлены! Спасибо 📬")
 
 def get_or_create_folder(name, parent_id):
@@ -183,7 +191,7 @@ def get_or_create_folder(name, parent_id):
 
 def check_reminders():
     try:
-        rows = sheet.get_all_values()[1:]
+        rows = sheet_main.get_all_values()[1:]
         today = datetime.now(POLAND_TIME)
         warned = set()
         for row in rows:
@@ -218,6 +226,7 @@ if __name__ == '__main__':
     bot.remove_webhook()
     bot.set_webhook(url=WEBHOOK_URL)
     app.run(host='0.0.0.0', port=10000)
+
 
 
 
