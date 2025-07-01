@@ -106,6 +106,10 @@ def handle_photo(msg):
         return
 
     file_id = msg.photo[-1].file_id
+    # ✅ Отмечаем, что фото в обработке
+    bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
+    save_photo_hash(file_hash)
+    
     file_info = bot.get_file(file_id)
     file_data = bot.download_file(file_info.file_path)
 
@@ -121,10 +125,6 @@ def handle_photo(msg):
     if photo_hash_exists(file_hash):
         bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
         return
-
-    # ✅ Отмечаем, что фото в обработке
-    bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
-    save_photo_hash(file_hash)
 
     # Добавление в очередь
     queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
