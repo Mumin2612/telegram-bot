@@ -15,6 +15,9 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
 import schedule
+from PIL import Image
+from io import BytesIO
+import pytesseract
 
 # === НАСТРОЙКИ ===
 BOT_TOKEN = '8011399758:AAGQaLTFK7M0iOLRkgps5znIc9rI5jjcu8A'
@@ -29,23 +32,23 @@ WEBHOOK_URL = 'https://telegram-bot-p1o6.onrender.com'
 
 POLAND_TIME = timezone(timedelta(hours=2))
 USERS_FILE = 'users.json'
+HASHES_FILE = 'photo_hashes.json'
 
-# === Загрузка пользователей ===
-def load_users():
-    if os.path.exists(USERS_FILE):
-        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+# === JSON ===
+def load_json(path):
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return {}
 
-def save_users(data):
-    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+def save_json(path, data):
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-users_data = load_users()
+users_data = load_json(USERS_FILE)
+global_photo_hashes = load_json(HASHES_FILE)
 temp_user_data = {}
 photo_queue = {}
-photo_hashes = {}
-global_hashes = set()
 
 bot = telebot.TeleBot(BOT_TOKEN)
 app = Flask(__name__)
@@ -82,7 +85,7 @@ def handle_name(msg):
     name = msg.text.strip()
     spolka = temp_user_data[msg.chat.id]['company']
     users_data[user_id] = {'name': name, 'spolka': spolka}
-    save_users(users_data)
+    save_json(USERS_FILE, users_data)
     bot.send_message(msg.chat.id, "✅ Данные сохранены. Можешь отправлять фото 📸")
 
 @bot.message_handler(content_types=['photo'])
@@ -96,18 +99,21 @@ def handle_photo(msg):
     file_info = bot.get_file(file_id)
     file_data = bot.download_file(file_info.file_path)
 
+    image = Image.open(BytesIO(file_data))
+    text = pytesseract.image_to_string(image)
+    if not any(word.lower() in text.lower() for word in ["faktura", "invoice"]):
+        bot.send_message(msg.chat.id, "⚠️ Это изображение не похоже на фактуру. Попробуй ещё раз.")
+        return
+
     file_hash = hashlib.md5(file_data).hexdigest()
-    if file_hash in global_hashes:
+    if file_hash in global_photo_hashes:
         bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее другим пользователем.")
         return
 
-    hashes = photo_hashes.setdefault(user_id, set())
-    if file_hash in hashes:
-        bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
-        return
+    global_photo_hashes[file_hash] = user_id
+    save_json(HASHES_FILE, global_photo_hashes)
 
-    hashes.add(file_hash)
-    global_hashes.add(file_hash)
+    bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
 
     queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
     queue['photos'].append((file_id, msg, file_data))
@@ -130,7 +136,8 @@ def send_album(user_id, photos):
     name = data['name']
     spolka = data['spolka']
     first_name, last_name = name.split(maxsplit=1) if " " in name else (name, "")
-    username = photos[0][1].from_user.username or "—"
+    username = photos[0][1].from_user.username or None
+    username_link = f"[@{username}](https://t.me/{username})" if username else "—"
     tg_id = int(user_id)
     now = datetime.now(POLAND_TIME)
     now_str = now.strftime("%Y-%m-%d %H:%M")
@@ -153,11 +160,12 @@ def send_album(user_id, photos):
         os.remove(path)
         media.append(types.InputMediaPhoto(file_id))
 
-    caption = f"📄 Имя: {name}\n🆔 ID: {tg_id}\n👤 @{username}\n📅 {now_str}\n🏢 {spolka}"
+    caption = f"📄 Имя: {name}\n🆔 ID: {tg_id}\n👤 {username_link}\n📅 {now_str}\n🏢 {spolka}"
     media[0].caption = caption
+    media[0].parse_mode = "Markdown"
     bot.send_media_group(ADMIN_ID, media)
 
-    sheet.append_row([first_name, last_name, username, tg_id, now_str, spolka, ", ".join(drive_links)])
+    sheet.append_row([first_name, last_name, username or "", tg_id, now_str, spolka, ", ".join(drive_links)])
     bot.send_message(tg_id, "✅ Фото доставлены! Спасибо 📬")
 
 def get_or_create_folder(name, parent_id):
