@@ -115,17 +115,28 @@ def handle_photo(msg):
         bot.send_message(msg.chat.id, "⚠️ Это изображение не похоже на фактуру. Попробуй ещё раз.")
         return
 
-    file_hash = hashlib.md5(file_data).hexdigest()
-    if photo_hash_exists(file_hash):
-        bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
-        return
+ # OCR — проверка, что это действительно фактура
+image = Image.open(BytesIO(file_data))
+text = pytesseract.image_to_string(image)
+if not any(word.lower() in text.lower() for word in ["faktura", "invoice"]):
+    bot.send_message(msg.chat.id, "⚠️ Это изображение не похоже на фактуру. Попробуй ещё раз.")
+    return
 
-    save_photo_hash(file_hash)
-    bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
+# Проверка на дубликат
+file_hash = hashlib.md5(file_data).hexdigest()
+if photo_hash_exists(file_hash):
+    bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
+    return
 
-    queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
-    queue['photos'].append((file_id, msg, file_data))
-    queue['last_time'] = datetime.now(POLAND_TIME)
+# ✅ Отмечаем, что фото в обработке
+bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
+save_photo_hash(file_hash)
+
+# Добавление в очередь
+queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
+queue['photos'].append((file_id, msg, file_data))
+queue['last_time'] = datetime.now(POLAND_TIME)
+
 
 def photo_watcher():
     while True:
