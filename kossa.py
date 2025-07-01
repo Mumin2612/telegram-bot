@@ -42,7 +42,7 @@ credentials = Credentials.from_service_account_info(
 )
 gc = gspread.authorize(credentials)
 sheet = gc.open(SPREADSHEET_NAME)
-sheet_users = sheet.worksheet("users")
+sheet_users = sheet.worksheet("Пользователи")
 sheet_hashes = sheet.worksheet("hashes")
 sheet_main = sheet.sheet1
 drive_service = build('drive', 'v3', credentials=credentials)
