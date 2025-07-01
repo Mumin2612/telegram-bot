@@ -105,19 +105,21 @@ def handle_photo(msg):
         bot.send_message(msg.chat.id, "⚠️ Напиши /start и зарегистрируйся.")
         return
 
-    file_id = msg.photo[-1].file_id
-    # ✅ Отмечаем, что фото в обработке
     bot.send_message(msg.chat.id, "📥 Фото получено. Обрабатываем…")
-    save_photo_hash(file_hash)
-    
+
+    file_id = msg.photo[-1].file_id
     file_info = bot.get_file(file_id)
     file_data = bot.download_file(file_info.file_path)
 
     # OCR — проверка, что это действительно фактура
-    image = Image.open(BytesIO(file_data))
-    text = pytesseract.image_to_string(image)
-    if not any(word.lower() in text.lower() for word in ["faktura", "invoice"]):
-        bot.send_message(msg.chat.id, "⚠️ Это изображение не похоже на фактуру. Попробуй ещё раз.")
+    try:
+        image = Image.open(BytesIO(file_data))
+        text = pytesseract.image_to_string(image)
+        if not any(word.lower() in text.lower() for word in ["faktura", "invoice"]):
+            bot.send_message(msg.chat.id, "⚠️ Это изображение не похоже на фактуру. Попробуй ещё раз.")
+            return
+    except Exception as e:
+        bot.send_message(ADMIN_ID, f"❌ OCR ошибка: {e}")
         return
 
     # Проверка на дубликат
@@ -125,6 +127,8 @@ def handle_photo(msg):
     if photo_hash_exists(file_hash):
         bot.send_message(msg.chat.id, "⚠️ Это фото уже было отправлено ранее.")
         return
+
+    save_photo_hash(file_hash)
 
     # Добавление в очередь
     queue = photo_queue.setdefault(user_id, {'photos': [], 'last_time': None})
@@ -224,13 +228,12 @@ def webhook():
         bot.send_message(ADMIN_ID, f"❌ Ошибка webhook:\n{e}")
     return 'OK', 200
 
-if __name__ == '__main__':
-    threading.Thread(target=photo_watcher, daemon=True).start()
-    threading.Thread(target=scheduler_loop, daemon=True).start()
-    bot.remove_webhook()
-    bot.set_webhook(url=WEBHOOK_URL)
-    app.run(host='0.0.0.0', port=10000)
-
+# Запускаем потоки и вебхук без проверки __name__
+threading.Thread(target=photo_watcher, daemon=True).start()
+threading.Thread(target=scheduler_loop, daemon=True).start()
+bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL)
+app.run(host='0.0.0.0', port=10000)
 
 
 
