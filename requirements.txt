@@ -1,9 +1,10 @@
+Flask
+pyTelegramBotAPI
 pytesseract
-Pillow
+pillow
 gspread
-google-api-python-client
 google-auth
 google-auth-oauthlib
-Flask
+google-auth-httplib2
+google-api-python-client
 schedule
-pyTelegramBotAPI
